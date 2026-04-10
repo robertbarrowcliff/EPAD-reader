@@ -49,7 +49,8 @@ if uploaded_file:
     def is_yes(value):
         if pd.isna(value):
             return False
-        return str(value).strip().lower() == "yes"
+        v = str(value).strip().lower()
+        return v.startswith("yes")
 
     def get_value(row, keyword):
         for col in df.columns:
