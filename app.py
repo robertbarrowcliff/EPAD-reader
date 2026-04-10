@@ -1,4 +1,3 @@
-```python
 import pandas as pd
 import streamlit as st
 
@@ -210,4 +209,3 @@ if uploaded_file:
     st.write(f"Total students: {len(result_df)}")
     st.write(f"Final interviews completed: {(result_df['Final Interview'] == 'Yes').sum()}")
     st.write(f"Professional values achieved: {(result_df['Professional Values'] == 'Yes').sum()}")
-```
