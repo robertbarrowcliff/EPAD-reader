@@ -86,15 +86,13 @@ if uploaded_file:
         "FAILING TO PROGRESS"
     ])
 
-    all_prof_cols = [
+    prof_values_cols = [
         c for c in df.columns
-        if part in c and "Placement" in c and "Professional Values in Practice" in c and "Final Assessment" in c
+        if part in c
+        and "Professional Values in Practice" in c
+        and "Final Assessment" in c
     ]
 
-    prof_values_cols = [
-        c for c in all_prof_cols
-        if any(f"/ {i}." in c for i in range(1, 17))
-    ]
 
 
 
