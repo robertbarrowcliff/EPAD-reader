@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-st.title("EPAD Progress Tracker. Version 2.0")
+st.title("EPAD Progress Tracker. Version 2.1")
 
 uploaded_file = st.file_uploader("Upload EPAD CSV or Excel", type=["csv", "xlsx"])
 
@@ -12,7 +12,7 @@ if uploaded_file:
         "Part 1": ["Placement 1", "Placement 2", "Retrieval Placement"],
         "Part 2": ["Placement 3", "Placement 4", "Retrieval Placement"],
         "Part 3": ["Placement 5", "Placement 6", "Retrieval Placement"],
-        "Part 4": ["Placement 7", "Placement 8", "Retrieval Placement"],  # adjust if needed
+        "Part 4": ["Placement 7", "Placement 8", "Retrieval Placement"],
     }
 
     # --- Selectors ---
@@ -45,13 +45,12 @@ if uploaded_file:
 
         v = str(value).strip().lower()
 
+        # ignore placeholders
         if v in ["", "nan", "answer", "assessed by", "assessed on", "released", "not answered"]:
             return False
 
-        if any(k in v for k in ["yes", "complete", "completed", "achieved", "done", "pass"]):
-            return True
-
-        return False
+        # any meaningful content counts as complete
+        return True
 
     def any_yes(row, columns):
         return "Yes" if any(is_completed(row[c]) for c in columns) else "No"
@@ -62,16 +61,21 @@ if uploaded_file:
                 return row[col]
         return ""
 
-    # --- Identify columns (NOW placement-specific) ---
-    orientation_cols = find_cols_all([part, placement, "Orientation"])
-    initial_cols = find_cols_all([part, placement, "Initial Interview"])
+    # --- Identify columns (more precise) ---
+    orientation_cols = find_cols_all([part, placement, "Orientation", "Verification"])
+
+    initial_cols = find_cols_all([part, placement, "Initial Interview"]) + \
+                   find_cols_all([part, placement, "Practice Assessor"]) + \
+                   find_cols_all([part, placement, "Practice Supervisor"])
+
     midpoint_cols = find_cols_all([part, placement, "Mid Point Interview"])
+
     final_cols = find_cols_all([part, placement, "Final Interview"])
 
     progressing_mid_cols = find_cols_all([part, placement, "Mid Point Interview", "FAILING TO PROGRESS"])
     progressing_final_cols = find_cols_all([part, placement, "Final Interview", "FAILING TO PROGRESS"])
 
-    # --- Professional Values (CORRECTED) ---
+    # --- Professional Values ---
     prof_values_cols = [
         c for c in df.columns
         if (
@@ -83,8 +87,12 @@ if uploaded_file:
         )
     ]
 
-    # DEBUG (remove later)
-    st.write("DEBUG - PV columns found:", len(prof_values_cols))
+    # --- DEBUG (remove later) ---
+    st.write("DEBUG - Orientation:", len(orientation_cols))
+    st.write("DEBUG - Initial:", len(initial_cols))
+    st.write("DEBUG - Midpoint:", len(midpoint_cols))
+    st.write("DEBUG - Final:", len(final_cols))
+    st.write("DEBUG - PV:", len(prof_values_cols))
 
     # --- Process data ---
     output = []
