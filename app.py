@@ -1,19 +1,33 @@
+```python
 import pandas as pd
 import streamlit as st
 
-st.title("EPAD Progress Tracker. Version 1.1")
+st.title("EPAD Progress Tracker. Version 2.0")
 
 uploaded_file = st.file_uploader("Upload EPAD CSV or Excel", type=["csv", "xlsx"])
 
 if uploaded_file:
-    # --- Select Part / Year ---
-    st.subheader("Select Year")
-    part = st.selectbox(
-        "Choose EPAD Part",
-        ["Part 1", "Part 2", "Part 3", "Part 4"]
-    )
 
-    # Load file
+    # --- Part → Placement mapping ---
+    part_to_placements = {
+        "Part 1": ["Placement 1", "Placement 2", "Retrieval Placement"],
+        "Part 2": ["Placement 3", "Placement 4", "Retrieval Placement"],
+        "Part 3": ["Placement 5", "Placement 6", "Retrieval Placement"],
+        "Part 4": ["Placement 7", "Placement 8", "Retrieval Placement"],  # adjust if needed
+    }
+
+    # --- Selectors ---
+    st.subheader("Select Placement")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        part = st.selectbox("Choose EPAD Part", list(part_to_placements.keys()))
+
+    with col2:
+        placement = st.selectbox("Choose Placement", part_to_placements[part])
+
+    # --- Load file ---
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file, low_memory=False)
     else:
@@ -26,20 +40,15 @@ if uploaded_file:
             if all(k.lower() in c.lower() for k in keywords)
         ]
 
-    def find_cols_prefix(prefix):
-        return [c for c in df.columns if c.startswith(prefix)]
-
     def is_completed(value):
         if pd.isna(value):
             return False
 
         v = str(value).strip().lower()
 
-        # ignore placeholders
         if v in ["", "nan", "answer", "assessed by", "assessed on", "released", "not answered"]:
             return False
 
-        # only count as complete if meaningful
         if any(k in v for k in ["yes", "complete", "completed", "achieved", "done", "pass"]):
             return True
 
@@ -48,58 +57,35 @@ if uploaded_file:
     def any_yes(row, columns):
         return "Yes" if any(is_completed(row[c]) for c in columns) else "No"
 
-    def all_yes(row, columns):
-        return "Yes" if all(is_completed(row[c]) for c in columns) else "No"
-
     def get_value(row, keyword):
         for col in df.columns:
             if keyword.lower() in col.lower():
                 return row[col]
         return ""
 
-    # --- Identify columns ---
-    orientation_cols = find_cols_all([part, "Placement", "Orientation", "Declaration"]) + \
-                       find_cols_all([part, "Placement", "Orientation", "Verification"])
+    # --- Identify columns (NOW placement-specific) ---
+    orientation_cols = find_cols_all([part, placement, "Orientation"])
+    initial_cols = find_cols_all([part, placement, "Initial Interview"])
+    midpoint_cols = find_cols_all([part, placement, "Mid Point Interview"])
+    final_cols = find_cols_all([part, placement, "Final Interview"])
 
-    initial_cols = find_cols_all([part, "Placement", "Initial Interview", "Student"]) + \
-                   find_cols_all([part, "Placement", "Initial Interview", "Practice Supervisor"]) + \
-                   find_cols_all([part, "Placement", "Initial Interview", "Practice Assessor"])
+    progressing_mid_cols = find_cols_all([part, placement, "Mid Point Interview", "FAILING TO PROGRESS"])
+    progressing_final_cols = find_cols_all([part, placement, "Final Interview", "FAILING TO PROGRESS"])
 
-    midpoint_cols = find_cols_all([part, "Placement", "Mid Point Interview", "Student"]) + \
-                    find_cols_all([part, "Placement", "Mid Point Interview", "Practice Assessor"])
-
-    final_cols = find_cols_all([part, "Placement", "Final Interview", "Student"]) + \
-                 find_cols_all([part, "Placement", "Final Interview", "Practice Assessor"])
-
-    progressing_final_cols = find_cols_all([
-        part,
-        "Placement",
-        "Final Interview",
-        "FAILING TO PROGRESS"
-    ])
-
-    progressing_mid_cols = find_cols_all([
-        part,
-        "Placement",
-        "Mid Point Interview",
-        "FAILING TO PROGRESS"
-    ])
-
+    # --- Professional Values (CORRECTED) ---
     prof_values_cols = [
         c for c in df.columns
         if (
             part.lower() in c.lower()
-            and "placement" in c.lower()
+            and placement.lower() in c.lower()
             and "professional values" in c.lower()
             and "final assessment" in c.lower()
             and any(f"/ {i}." in c for i in range(1, 16))
-            and "[" not in c   # 🚫 excludes things like [0-99]
         )
     ]
 
-
     # DEBUG (remove later)
-    st.write("DEBUG - Professional Values columns:", prof_values_cols)
+    st.write("DEBUG - PV columns found:", len(prof_values_cols))
 
     # --- Process data ---
     output = []
@@ -112,8 +98,7 @@ if uploaded_file:
         student["Email"] = get_value(row, "Email")
         student["Cohort"] = get_value(row, "submission")
 
-        student["Placement"] = get_value(row, "Placement Provider://Column 1")
-        student["Placement Provider"] = get_value(row, "Placement Provider://Column 2")
+        student["Placement"] = placement
 
         student["Orientation"] = any_yes(row, orientation_cols)
         student["Initial Interview"] = any_yes(row, initial_cols)
@@ -156,16 +141,12 @@ if uploaded_file:
 
         if student["Orientation"] == "No":
             missing.append("Orientation")
-
         if student["Initial Interview"] == "No":
             missing.append("Initial Interview")
-
         if student["Midpoint Interview"] == "No":
             missing.append("Midpoint Interview")
-
         if student["Final Interview"] == "No":
             missing.append("Final Interview")
-
         if student["Professional Values"] == "No":
             missing.append("Professional Values")
 
@@ -177,7 +158,6 @@ if uploaded_file:
 
     # --- Filters ---
     st.subheader("Student Overview")
-    st.subheader("Filters")
 
     col1, col2, col3 = st.columns(3)
 
@@ -230,3 +210,4 @@ if uploaded_file:
     st.write(f"Total students: {len(result_df)}")
     st.write(f"Final interviews completed: {(result_df['Final Interview'] == 'Yes').sum()}")
     st.write(f"Professional values achieved: {(result_df['Professional Values'] == 'Yes').sum()}")
+```
