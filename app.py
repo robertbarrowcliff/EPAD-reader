@@ -35,10 +35,7 @@ if uploaded_file:
     def all_yes(row, columns):
         return "Yes" if all(is_completed(row[c]) for c in columns) else "No"
 
-    def is_completed(value):
-        if pd.isna(value):
-            return False
-        v = str(value).strip().lower()
+def is_completed(value):
     if pd.isna(value):
         return False
 
