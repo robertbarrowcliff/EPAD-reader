@@ -1,3 +1,4 @@
+```python
 import pandas as pd
 import streamlit as st
 
@@ -29,36 +30,35 @@ if uploaded_file:
     def find_cols_prefix(prefix):
         return [c for c in df.columns if c.startswith(prefix)]
 
+    def is_completed(value):
+        if pd.isna(value):
+            return False
+
+        v = str(value).strip().lower()
+
+        # ignore placeholders
+        if v in ["", "nan", "answer", "assessed by", "assessed on", "released", "not answered"]:
+            return False
+
+        # only count as complete if meaningful
+        if any(k in v for k in ["yes", "complete", "completed", "achieved", "done", "pass"]):
+            return True
+
+        return False
+
     def any_yes(row, columns):
         return "Yes" if any(is_completed(row[c]) for c in columns) else "No"
 
     def all_yes(row, columns):
         return "Yes" if all(is_completed(row[c]) for c in columns) else "No"
 
-def is_completed(value):
-    if pd.isna(value):
-        return False
-
-    v = str(value).strip().lower()
-
-    # ignore placeholders
-    if v in ["", "nan", "answer", "assessed by", "assessed on", "released", "not answered"]:
-        return False
-
-    # only count as complete if meaningful
-    if any(k in v for k in ["yes", "complete", "completed", "achieved", "done", "pass"]):
-        return True
-
-    return False
-
-
     def get_value(row, keyword):
         for col in df.columns:
             if keyword.lower() in col.lower():
                 return row[col]
         return ""
-    # --- Identify columns ---
 
+    # --- Identify columns ---
     orientation_cols = find_cols_all([part, "Placement", "Orientation", "Declaration"]) + \
                        find_cols_all([part, "Placement", "Orientation", "Verification"])
 
@@ -85,6 +85,7 @@ def is_completed(value):
         "Mid Point Interview",
         "FAILING TO PROGRESS"
     ])
+
     prof_values_cols = [
         c for c in df.columns
         if (
@@ -94,7 +95,9 @@ def is_completed(value):
         )
     ]
 
+    # DEBUG (remove later)
     st.write("DEBUG - Professional Values columns:", prof_values_cols)
+
     # --- Process data ---
     output = []
 
@@ -103,7 +106,6 @@ def is_completed(value):
         student = {}
 
         student["Student Name"] = f"{get_value(row, 'First name')} {get_value(row, 'Last name')}"
-
         student["Email"] = get_value(row, "Email")
         student["Cohort"] = get_value(row, "submission")
 
@@ -115,13 +117,14 @@ def is_completed(value):
         student["Midpoint Interview"] = any_yes(row, midpoint_cols)
         student["Final Interview"] = any_yes(row, final_cols)
 
+        # --- Professional Values ---
         completed_pv = sum(is_completed(row[c]) for c in prof_values_cols)
         total_pv = len(prof_values_cols)
 
         student["Professional Values"] = "Yes" if completed_pv == total_pv and total_pv > 0 else "No"
         student["PV Progress"] = f"{completed_pv}/{total_pv}" if total_pv > 0 else "0/0"
 
-        # Progressing logic
+        # --- Progressing ---
         def get_progressing_status(row, columns):
             for col in columns:
                 val = str(row[col]).strip().lower()
@@ -133,7 +136,8 @@ def is_completed(value):
 
         student["Progressing (Midpoint)"] = get_progressing_status(row, progressing_mid_cols)
         student["Progressing (Final)"] = get_progressing_status(row, progressing_final_cols)
-        # At Risk logic
+
+        # --- At Risk ---
         if (
             student["Progressing (Midpoint)"] == "No"
             or student["Progressing (Final)"] == "No"
@@ -146,6 +150,7 @@ def is_completed(value):
 
         # --- Missing items ---
         missing = []
+
         if student["Orientation"] == "No":
             missing.append("Orientation")
 
@@ -165,11 +170,7 @@ def is_completed(value):
 
         output.append(student)
 
-
-
     result_df = pd.DataFrame(output)
-
-    # --- Display ---
 
     # --- Filters ---
     st.subheader("Student Overview")
@@ -186,7 +187,6 @@ def is_completed(value):
 
     search_name = st.text_input("🔍 Search student name")
 
-    # --- Apply filters ---
     filtered_df = result_df.copy()
 
     if show_at_risk:
@@ -209,24 +209,22 @@ def is_completed(value):
             filtered_df["Student Name"].str.contains(search_name, case=False, na=False)
         ]
 
-    # --- Display filtered data ---
     # --- Colour coding ---
     def highlight_rows(row):
         if row["At Risk"] == "Yes":
-            return ["background-color: #f8d7da"] * len(row)  # light red
+            return ["background-color: #f8d7da"] * len(row)
         elif row["Final Interview"] == "No" or row["Midpoint Interview"] == "No":
-            return ["background-color: #fff3cd"] * len(row)  # light amber
+            return ["background-color: #fff3cd"] * len(row)
         else:
-            return ["background-color: #d4edda"] * len(row)  # light green
+            return ["background-color: #d4edda"] * len(row)
 
     styled_df = filtered_df.style.apply(highlight_rows, axis=1)
 
     st.dataframe(styled_df, use_container_width=True)
 
-
-    # --- Quick stats ---
+    # --- Summary ---
     st.subheader("Summary")
     st.write(f"Total students: {len(result_df)}")
-
     st.write(f"Final interviews completed: {(result_df['Final Interview'] == 'Yes').sum()}")
     st.write(f"Professional values achieved: {(result_df['Professional Values'] == 'Yes').sum()}")
+```
