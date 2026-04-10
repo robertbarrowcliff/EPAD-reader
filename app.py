@@ -91,8 +91,12 @@ if uploaded_file:
             part.lower() in c.lower()
             and "placement" in c.lower()
             and "professional values" in c.lower()
+            and "final assessment" in c.lower()
+            and any(f"/ {i}." in c for i in range(1, 16))
+            and "[" not in c   # 🚫 excludes things like [0-99]
         )
     ]
+
 
     # DEBUG (remove later)
     st.write("DEBUG - Professional Values columns:", prof_values_cols)
