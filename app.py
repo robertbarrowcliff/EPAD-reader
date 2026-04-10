@@ -33,32 +33,26 @@ if uploaded_file:
         return "Yes" if any(is_completed(row[c]) for c in columns) else "No"
 
     def all_yes(row, columns):
-        return "Yes" if all(is_yes(row[c]) for c in columns) else "No"
+        return "Yes" if all(is_completed(row[c]) for c in columns) else "No"
 
     def is_completed(value):
         if pd.isna(value):
             return False
         v = str(value).strip().lower()
+    if pd.isna(value):
+        return False
 
-        # ignore default / placeholder values
-        if v in ["", "nan", "answer", "assessed by", "assessed on", "released", "not answered"]:
-             return False
+    v = str(value).strip().lower()
+
+    # ignore placeholders
+    if v in ["", "nan", "answer", "assessed by", "assessed on", "released", "not answered"]:
+        return False
+
+    # only count as complete if meaningful
+    if any(k in v for k in ["yes", "complete", "completed", "achieved", "done", "pass"]):
         return True
 
-    # NEW: specifically check for "Yes"
-    def is_yes(value):
-        if pd.isna(value):
-            return False
-
-    def is_yes(value):
-        if pd.isna(value):
-            return False
-
-        v = str(value).strip().lower()
-
-        # ONLY explicit "yes" counts
-        return v == "yes"
-
+    return False
 
 
     def get_value(row, keyword):
@@ -94,17 +88,16 @@ if uploaded_file:
         "Mid Point Interview",
         "FAILING TO PROGRESS"
     ])
-
     prof_values_cols = [
         c for c in df.columns
-        if part in c
-        and "Professional Values in Practice" in c
-        and "Final Assessment" in c
+        if (
+            part.lower() in c.lower()
+            and "placement" in c.lower()
+            and "professional values" in c.lower()
+        )
     ]
 
-
-
-
+    st.write("DEBUG - Professional Values columns:", prof_values_cols)
     # --- Process data ---
     output = []
 
@@ -125,7 +118,11 @@ if uploaded_file:
         student["Midpoint Interview"] = any_yes(row, midpoint_cols)
         student["Final Interview"] = any_yes(row, final_cols)
 
-        student["Professional Values"] = all_yes(row, prof_values_cols)
+        completed_pv = sum(is_completed(row[c]) for c in prof_values_cols)
+        total_pv = len(prof_values_cols)
+
+        student["Professional Values"] = "Yes" if completed_pv == total_pv and total_pv > 0 else "No"
+        student["PV Progress"] = f"{completed_pv}/{total_pv}" if total_pv > 0 else "0/0"
 
         # Progressing logic
         def get_progressing_status(row, columns):
@@ -149,6 +146,25 @@ if uploaded_file:
             student["At Risk"] = "Yes"
         else:
             student["At Risk"] = "No"
+
+        # --- Missing items ---
+        missing = []
+        if student["Orientation"] == "No":
+            missing.append("Orientation")
+
+        if student["Initial Interview"] == "No":
+            missing.append("Initial Interview")
+
+        if student["Midpoint Interview"] == "No":
+            missing.append("Midpoint Interview")
+
+        if student["Final Interview"] == "No":
+            missing.append("Final Interview")
+
+        if student["Professional Values"] == "No":
+            missing.append("Professional Values")
+
+        student["Missing Items"] = ", ".join(missing)
 
         output.append(student)
 
